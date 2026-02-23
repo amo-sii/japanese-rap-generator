@@ -281,6 +281,36 @@
 
     .btn-suno:hover { background: rgba(168, 85, 247, 0.25); }
 
+    .btn-mv {
+      background: rgba(6, 182, 212, 0.15);
+      border: 1px solid var(--cyan);
+      border-radius: 8px;
+      color: var(--cyan);
+      cursor: pointer;
+      font-size: 0.82rem;
+      font-weight: 700;
+      padding: 6px 14px;
+      font-family: inherit;
+      transition: background 0.2s;
+    }
+
+    .btn-mv:hover:not(:disabled) { background: rgba(6, 182, 212, 0.25); }
+    .btn-mv:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    .mv-area { margin-top: 12px; }
+
+    .mv-area video {
+      width: 100%;
+      border-radius: 8px;
+      margin-bottom: 8px;
+    }
+
+    .mv-status {
+      color: var(--muted);
+      font-size: 0.82rem;
+      margin-top: 6px;
+    }
+
     .error-box {
       background: rgba(233, 69, 96, 0.1);
       border: 1px solid var(--accent);
@@ -423,10 +453,20 @@
       });
     });
 
-    // APIキー表示切り替え
+    // APIキー表示切り替え＆localStorage保存
     const keyInput = document.getElementById('apiKey');
+
+    // 保存済みのキーを自動入力
+    const savedKey = localStorage.getItem('suno_api_key');
+    if (savedKey) keyInput.value = savedKey;
+
     document.getElementById('toggleKey').addEventListener('click', () => {
       keyInput.type = keyInput.type === 'password' ? 'text' : 'password';
+    });
+
+    // 入力するたびに保存
+    keyInput.addEventListener('input', () => {
+      localStorage.setItem('suno_api_key', keyInput.value.trim());
     });
 
     // 生成処理
@@ -525,6 +565,7 @@
         const audioUrl = track.audioUrl || track.streamAudioUrl || '';
         const sunoUrl = track.id ? `https://suno.com/song/${track.id}` : '#';
         const coverUrl = track.imageUrl || '';
+        const musicId = track.id || '';
 
         const div = document.createElement('div');
         div.className = 'track-card';
@@ -538,12 +579,75 @@
           <div class="track-actions">
             ${audioUrl ? `<a class="btn-download" href="${audioUrl}" download="rap_track_${i+1}.mp3">⬇️ ダウンロード</a>` : ''}
             <a class="btn-suno" href="${sunoUrl}" target="_blank" rel="noopener">🔗 Sunoで開く</a>
+            ${musicId ? `<button class="btn-mv" data-music-id="${musicId}" data-index="${i}">🎬 MVを生成</button>` : ''}
           </div>
+          <div class="mv-area" id="mv-area-${i}"></div>
         `;
         trackList.appendChild(div);
       });
 
+      // MVボタンのクリックイベント
+      document.querySelectorAll('.btn-mv').forEach(btn => {
+        btn.addEventListener('click', async () => {
+          const musicId = btn.dataset.musicId;
+          const idx = btn.dataset.index;
+          const mvArea = document.getElementById(`mv-area-${idx}`);
+          const apiKey = keyInput.value.trim();
+
+          btn.disabled = true;
+          btn.textContent = '🎬 MV生成中...';
+          mvArea.innerHTML = '<p class="mv-status">MVを生成中... しばらくお待ちください（約2〜3分）</p>';
+
+          try {
+            // MV生成リクエスト
+            const genRes = await fetch('/api/generate-mv', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ music_id: musicId, music_index: parseInt(idx), api_key: apiKey }),
+            });
+            const genData = await genRes.json();
+            if (!genRes.ok) throw new Error(genData.error || 'MV生成リクエストに失敗しました');
+
+            // ポーリングで完了を待つ
+            const videoUrl = await pollMvCompletion(genData.task_id, apiKey, mvArea);
+
+            mvArea.innerHTML = `
+              <video controls src="${videoUrl}"></video>
+              <div class="track-actions">
+                <a class="btn-download" href="${videoUrl}" download="rap_mv_${idx}.mp4">⬇️ MVをダウンロード</a>
+              </div>
+            `;
+            btn.textContent = '🎬 MV生成済み';
+          } catch (err) {
+            mvArea.innerHTML = `<p class="mv-status" style="color:#fb7185">${err.message}</p>`;
+            btn.disabled = false;
+            btn.textContent = '🎬 MVを生成';
+          }
+        });
+      });
+
       resultsDiv.classList.add('visible');
+    }
+
+    async function pollMvCompletion(taskId, apiKey, mvArea, maxWait = 300000) {
+      const interval = 6000;
+      const deadline = Date.now() + maxWait;
+
+      while (Date.now() < deadline) {
+        await new Promise(r => setTimeout(r, interval));
+
+        const res = await fetch(`/api/mv-status?task_id=${encodeURIComponent(taskId)}&api_key=${encodeURIComponent(apiKey)}`);
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'MVステータス取得に失敗しました');
+
+        if (data.successFlag === 'SUCCESS') {
+          return data.response.videoUrl;
+        }
+
+        mvArea.innerHTML = `<p class="mv-status">MV生成中... (${data.successFlag || '処理中'})</p>`;
+      }
+
+      throw new Error('タイムアウト: MV生成に時間がかかりすぎています。');
     }
   </script>
 </body>
