@@ -1,0 +1,550 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>日本語ラップジェネレーター</title>
+  <style>
+    :root {
+      --bg: #0d0d0d;
+      --surface: #1a1a2e;
+      --surface2: #16213e;
+      --accent: #e94560;
+      --accent2: #0f3460;
+      --purple: #a855f7;
+      --cyan: #06b6d4;
+      --text: #f1f5f9;
+      --muted: #94a3b8;
+      --border: #334155;
+      --success: #22c55e;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Hiragino Kaku Gothic ProN', 'Meiryo', sans-serif;
+      min-height: 100vh;
+      padding: 24px 16px;
+    }
+
+    .container {
+      max-width: 720px;
+      margin: 0 auto;
+    }
+
+    header {
+      text-align: center;
+      margin-bottom: 32px;
+    }
+
+    header h1 {
+      font-size: 2rem;
+      font-weight: 900;
+      letter-spacing: 0.05em;
+      background: linear-gradient(135deg, var(--accent), var(--purple), var(--cyan));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      margin-bottom: 6px;
+    }
+
+    header p {
+      color: var(--muted);
+      font-size: 0.9rem;
+    }
+
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 24px;
+      margin-bottom: 20px;
+    }
+
+    .card h2 {
+      font-size: 1rem;
+      font-weight: 700;
+      margin-bottom: 12px;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+    }
+
+    label {
+      display: block;
+      font-size: 0.85rem;
+      color: var(--muted);
+      margin-bottom: 6px;
+    }
+
+    input[type="text"],
+    input[type="password"],
+    textarea,
+    select {
+      width: 100%;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      color: var(--text);
+      font-size: 0.95rem;
+      padding: 10px 14px;
+      outline: none;
+      transition: border-color 0.2s;
+      font-family: inherit;
+    }
+
+    input[type="text"]:focus,
+    input[type="password"]:focus,
+    textarea:focus,
+    select:focus {
+      border-color: var(--purple);
+    }
+
+    textarea {
+      min-height: 200px;
+      resize: vertical;
+      line-height: 1.7;
+    }
+
+    .api-key-row {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .api-key-row input {
+      flex: 1;
+    }
+
+    .btn-icon {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--muted);
+      cursor: pointer;
+      font-size: 1.1rem;
+      padding: 9px 12px;
+      transition: color 0.2s;
+    }
+    .btn-icon:hover { color: var(--text); }
+
+    .style-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+
+    .style-chip {
+      background: var(--surface2);
+      border: 2px solid var(--border);
+      border-radius: 10px;
+      cursor: pointer;
+      padding: 12px 14px;
+      text-align: center;
+      transition: all 0.2s;
+      user-select: none;
+    }
+
+    .style-chip:hover {
+      border-color: var(--purple);
+    }
+
+    .style-chip.selected {
+      border-color: var(--purple);
+      background: rgba(168, 85, 247, 0.15);
+    }
+
+    .style-chip .emoji { font-size: 1.4rem; display: block; margin-bottom: 4px; }
+    .style-chip .name { font-size: 0.85rem; font-weight: 700; }
+    .style-chip .desc { font-size: 0.72rem; color: var(--muted); margin-top: 2px; }
+
+    .generate-btn {
+      width: 100%;
+      background: linear-gradient(135deg, var(--accent), var(--purple));
+      border: none;
+      border-radius: 12px;
+      color: #fff;
+      cursor: pointer;
+      font-size: 1.05rem;
+      font-weight: 800;
+      letter-spacing: 0.05em;
+      padding: 16px;
+      transition: opacity 0.2s, transform 0.1s;
+      font-family: inherit;
+    }
+
+    .generate-btn:hover:not(:disabled) {
+      opacity: 0.9;
+      transform: translateY(-1px);
+    }
+
+    .generate-btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .status-area {
+      display: none;
+      margin-top: 20px;
+    }
+
+    .status-area.visible { display: block; }
+
+    .progress-bar-wrap {
+      background: var(--surface2);
+      border-radius: 100px;
+      height: 6px;
+      margin: 12px 0;
+      overflow: hidden;
+    }
+
+    .progress-bar {
+      background: linear-gradient(90deg, var(--accent), var(--purple), var(--cyan));
+      background-size: 200% 100%;
+      animation: progress-slide 1.5s linear infinite;
+      height: 100%;
+      width: 100%;
+    }
+
+    @keyframes progress-slide {
+      0% { background-position: 200% 0; }
+      100% { background-position: -200% 0; }
+    }
+
+    .status-msg {
+      color: var(--muted);
+      font-size: 0.88rem;
+      text-align: center;
+    }
+
+    .results {
+      display: none;
+      margin-top: 20px;
+    }
+
+    .results.visible { display: block; }
+
+    .track-card {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 16px;
+      margin-bottom: 14px;
+    }
+
+    .track-card h3 {
+      font-size: 0.9rem;
+      color: var(--muted);
+      margin-bottom: 10px;
+    }
+
+    audio {
+      width: 100%;
+      accent-color: var(--purple);
+    }
+
+    .track-actions {
+      display: flex;
+      gap: 10px;
+      margin-top: 10px;
+    }
+
+    .btn-download {
+      background: rgba(34, 197, 94, 0.15);
+      border: 1px solid var(--success);
+      border-radius: 8px;
+      color: var(--success);
+      cursor: pointer;
+      font-size: 0.82rem;
+      font-weight: 700;
+      padding: 6px 14px;
+      text-decoration: none;
+      transition: background 0.2s;
+    }
+
+    .btn-download:hover { background: rgba(34, 197, 94, 0.25); }
+
+    .btn-suno {
+      background: rgba(168, 85, 247, 0.15);
+      border: 1px solid var(--purple);
+      border-radius: 8px;
+      color: var(--purple);
+      cursor: pointer;
+      font-size: 0.82rem;
+      font-weight: 700;
+      padding: 6px 14px;
+      text-decoration: none;
+      transition: background 0.2s;
+    }
+
+    .btn-suno:hover { background: rgba(168, 85, 247, 0.25); }
+
+    .error-box {
+      background: rgba(233, 69, 96, 0.1);
+      border: 1px solid var(--accent);
+      border-radius: 10px;
+      color: #fb7185;
+      font-size: 0.88rem;
+      margin-top: 16px;
+      padding: 12px 16px;
+      display: none;
+    }
+
+    .error-box.visible { display: block; }
+
+    .tips {
+      color: var(--muted);
+      font-size: 0.8rem;
+      line-height: 1.6;
+      margin-top: 8px;
+    }
+
+    .tips li { margin-left: 16px; margin-bottom: 2px; }
+
+    @media (max-width: 480px) {
+      .style-grid { grid-template-columns: 1fr 1fr; }
+      header h1 { font-size: 1.5rem; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>🎤 日本語ラップジェネレーター</h1>
+      <p>歌詞を入力して、AIが日本語ラップ曲を生成します</p>
+    </header>
+
+    <!-- APIキー -->
+    <div class="card">
+      <h2>🔑 Suno APIキー</h2>
+      <div class="api-key-row">
+        <input type="password" id="apiKey" placeholder="Suno APIキーを入力..." />
+        <button class="btn-icon" id="toggleKey" title="表示/非表示">👁️</button>
+      </div>
+    </div>
+
+    <!-- 歌詞入力 -->
+    <div class="card">
+      <h2>✍️ 歌詞</h2>
+      <label for="title">曲タイトル（任意）</label>
+      <input type="text" id="title" placeholder="例: 夜の渋谷" style="margin-bottom:14px" />
+
+      <label for="lyrics">歌詞を入力</label>
+      <textarea id="lyrics" placeholder="[Verse]
+夜の都会 光る街
+俺のリリック 響く声
+夢を追いかけ ここまで来た
+誰も止められない この流れ
+
+[Hook]
+ライム刻む 止まらない
+ビートに乗せて 空へ飛べ"></textarea>
+
+      <ul class="tips" style="margin-top:10px">
+        <li>[Verse]、[Hook]、[Chorus]、[Bridge] などのセクション記法が使えます</li>
+        <li>英語と日本語を混ぜてもOK</li>
+      </ul>
+    </div>
+
+    <!-- スタイル選択 -->
+    <div class="card">
+      <h2>🎵 ラップスタイル</h2>
+      <div class="style-grid" id="styleGrid">
+        <div class="style-chip selected" data-style="Japanese hip-hop, J-rap, boom bap">
+          <span class="emoji">🎙️</span>
+          <div class="name">J-ラップ</div>
+          <div class="desc">王道の日本語ラップ</div>
+        </div>
+        <div class="style-chip" data-style="Japanese trap, trap beats, dark hip-hop, 808">
+          <span class="emoji">⚡</span>
+          <div class="name">トラップ</div>
+          <div class="desc">重低音・ダークなビート</div>
+        </div>
+        <div class="style-chip" data-style="Japanese drill, melodic drill, UK drill influenced">
+          <span class="emoji">🔫</span>
+          <div class="name">ドリル</div>
+          <div class="desc">攻撃的・都会的サウンド</div>
+        </div>
+        <div class="style-chip" data-style="Japanese lo-fi hip-hop, chill rap, mellow beats">
+          <span class="emoji">🌙</span>
+          <div class="name">ローファイ</div>
+          <div class="desc">チルでまったりした雰囲気</div>
+        </div>
+        <div class="style-chip" data-style="Japanese old school hip-hop, boom bap, 90s rap">
+          <span class="emoji">📼</span>
+          <div class="name">オールドスクール</div>
+          <div class="desc">90年代スタイル</div>
+        </div>
+        <div class="style-chip" data-style="Japanese pop rap, melodic rap, catchy hooks, upbeat">
+          <span class="emoji">🌸</span>
+          <div class="name">ポップラップ</div>
+          <div class="desc">キャッチーでポップな曲</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 生成ボタン -->
+    <button class="generate-btn" id="generateBtn">🎤 ラップを生成する</button>
+
+    <!-- エラー表示 -->
+    <div class="error-box" id="errorBox"></div>
+
+    <!-- 生成中 -->
+    <div class="status-area" id="statusArea">
+      <div class="card">
+        <div class="progress-bar-wrap">
+          <div class="progress-bar"></div>
+        </div>
+        <p class="status-msg" id="statusMsg">Sunoで生成中... しばらくお待ちください（約30〜60秒）</p>
+      </div>
+    </div>
+
+    <!-- 結果 -->
+    <div class="results" id="results">
+      <div class="card">
+        <h2>🎧 生成された楽曲</h2>
+        <div id="trackList"></div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // スタイル選択
+    const chips = document.querySelectorAll('.style-chip');
+    let selectedStyle = chips[0].dataset.style;
+
+    chips.forEach(chip => {
+      chip.addEventListener('click', () => {
+        chips.forEach(c => c.classList.remove('selected'));
+        chip.classList.add('selected');
+        selectedStyle = chip.dataset.style;
+      });
+    });
+
+    // APIキー表示切り替え
+    const keyInput = document.getElementById('apiKey');
+    document.getElementById('toggleKey').addEventListener('click', () => {
+      keyInput.type = keyInput.type === 'password' ? 'text' : 'password';
+    });
+
+    // 生成処理
+    const generateBtn = document.getElementById('generateBtn');
+    const statusArea = document.getElementById('statusArea');
+    const statusMsg = document.getElementById('statusMsg');
+    const resultsDiv = document.getElementById('results');
+    const trackList = document.getElementById('trackList');
+    const errorBox = document.getElementById('errorBox');
+
+    function showError(msg) {
+      errorBox.textContent = msg;
+      errorBox.classList.add('visible');
+    }
+
+    function hideError() {
+      errorBox.classList.remove('visible');
+    }
+
+    generateBtn.addEventListener('click', async () => {
+      const lyrics = document.getElementById('lyrics').value.trim();
+      const title = document.getElementById('title').value.trim();
+      const apiKey = keyInput.value.trim();
+
+      hideError();
+      resultsDiv.classList.remove('visible');
+      trackList.innerHTML = '';
+
+      if (!lyrics) { showError('歌詞を入力してください'); return; }
+      if (!apiKey) { showError('Suno APIキーを入力してください'); return; }
+
+      generateBtn.disabled = true;
+      statusArea.classList.add('visible');
+      statusMsg.textContent = 'Sunoに生成リクエスト送信中...';
+
+      try {
+        // 生成リクエスト送信
+        const genRes = await fetch('/api/generate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ lyrics, title, style: selectedStyle, api_key: apiKey }),
+        });
+        const genData = await genRes.json();
+
+        if (!genRes.ok) {
+          throw new Error(genData.error || '生成リクエストに失敗しました');
+        }
+
+        const taskId = genData.task_id;
+        statusMsg.textContent = `生成中... (タスクID: ${taskId})`;
+
+        // ポーリングで完了を待つ
+        const tracks = await pollForCompletion(taskId, apiKey);
+        renderTracks(tracks);
+
+      } catch (err) {
+        showError(err.message);
+      } finally {
+        generateBtn.disabled = false;
+        statusArea.classList.remove('visible');
+      }
+    });
+
+    // sunoapi.org のステータス: PENDING → TEXT_SUCCESS → FIRST_SUCCESS → SUCCESS
+    async function pollForCompletion(taskId, apiKey, maxWait = 180000) {
+      const interval = 5000;
+      const deadline = Date.now() + maxWait;
+
+      while (Date.now() < deadline) {
+        await new Promise(r => setTimeout(r, interval));
+
+        const res = await fetch(`/api/status?task_id=${encodeURIComponent(taskId)}&api_key=${encodeURIComponent(apiKey)}`);
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'ステータス取得に失敗しました');
+
+        const status = data.status;
+
+        if (status === 'SUCCESS') {
+          return data.response.sunoData;
+        }
+
+        const statusLabels = {
+          PENDING: '待機中...',
+          TEXT_SUCCESS: '歌詞処理完了、音楽生成中...',
+          FIRST_SUCCESS: 'ストリーミング準備完了、仕上げ中...',
+        };
+        statusMsg.textContent = statusLabels[status] || `生成中... (${status})`;
+      }
+
+      throw new Error('タイムアウト: 生成に時間がかかりすぎています。しばらく後に再試行してください。');
+    }
+
+    function renderTracks(sunoData) {
+      trackList.innerHTML = '';
+      sunoData.forEach((track, i) => {
+        const audioUrl = track.audioUrl || track.streamAudioUrl || '';
+        const sunoUrl = track.id ? `https://suno.com/song/${track.id}` : '#';
+        const coverUrl = track.imageUrl || '';
+
+        const div = document.createElement('div');
+        div.className = 'track-card';
+        div.innerHTML = `
+          <h3>トラック ${i + 1}${track.title ? ' — ' + track.title : ''}</h3>
+          ${coverUrl ? `<img src="${coverUrl}" alt="cover" style="width:100%;border-radius:8px;margin-bottom:10px;max-height:200px;object-fit:cover;">` : ''}
+          ${audioUrl
+            ? `<audio controls src="${audioUrl}"></audio>`
+            : `<p style="color:var(--muted);font-size:0.85rem">音声URLを取得できませんでした。Sunoのサイトで確認してください。</p>`
+          }
+          <div class="track-actions">
+            ${audioUrl ? `<a class="btn-download" href="${audioUrl}" download="rap_track_${i+1}.mp3">⬇️ ダウンロード</a>` : ''}
+            <a class="btn-suno" href="${sunoUrl}" target="_blank" rel="noopener">🔗 Sunoで開く</a>
+          </div>
+        `;
+        trackList.appendChild(div);
+      });
+
+      resultsDiv.classList.add('visible');
+    }
+  </script>
+</body>
+</html>
